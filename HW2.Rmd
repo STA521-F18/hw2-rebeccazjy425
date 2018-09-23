@@ -3,9 +3,9 @@ title: "HW2 STA521 Fall18"
 author: 'Jingyi Zhang, jz139, rebeccazjy425'
 date: "Due September 23, 2018 5pm"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
-  pdf_document: default
 ---
 
 ## Backgound Reading
@@ -18,7 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Exploratory Data Analysis
-```{r data, echo=FALSE,warning=FALSE}
+```{r data, echo=FALSE,warning=FALSE, message=FALSE}
 library(alr3)
 data(UN3, package="alr3")
 #help(UN3) 
@@ -39,7 +39,7 @@ summary(UN3)
 uni.val = apply(UN3, 2, unique)
 func = function(x){length(uni.val[[x]])}
 num.var = rbind(names(uni.val),sapply(1:length(uni.val), func))
-kable(num.var, caption="Number of Unique Values of Each Variable") %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+kable(num.var, caption="Number of Unique Values of Each Variable")                                                     %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 ```
 From the summary and the table of numbers of unique values, 6 variables contain missing data. All of the 7 variables are quantitative, so none is qualitative.
 
@@ -49,7 +49,7 @@ From the summary and the table of numbers of unique values, 6 variables contain 
 means = apply(UN3, 2, mean, na.rm=TRUE)
 sds = apply(UN3, 2, sd, na.rm = TRUE)
 summarys = rbind(means, sds)
-kable(summarys, caption="Mean and Sd of Each Variable") %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+kable(summarys, caption="Mean and Sd of Each Variable")                                                                %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 ```
 
 
@@ -96,9 +96,9 @@ avPlots(lm_all)
 
 First of all, from the summaries of the variables, only `Change` contains negative values, so we first transform `Change` all into non-negative values by subtracting the minimum value of `Change`.
 From question 5, we know that `Pop` and `PPgdp` might need a log transformation, so we use Box-Tidwell to examine if transformation are necessary. However, the Box-Tidwell suggest that transformations aren't necessary. However, the avplots in the previous questions did seem suspicious, so I still performed a log transformation and re-run the linear model with log transformations. It turns out that the log-transformed predictors show a much stronger linear relationship with the dependent variable and improved residual plots. Thus, log transformations are still kept for later analyses.
-```{r}
+```{r,tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 UN3_new = UN3  %>% mutate(Change_non = Change - min(na.omit(Change))) %>% select(-Change)
-without_log = car::boxTidwell(ModernC ~  Pop + PPgdp, ~  Fertility + Change_non + Frate + Purban, data=UN3_new, na.action = na.omit)
+without_log = boxTidwell(ModernC ~  Pop + PPgdp, ~  Fertility + Change_non + Frate + Purban, data=UN3_new, na.action = na.omit)
 without_log
 UN3_log = UN3_new %>% mutate(PPgdp_log = log(PPgdp), Pop_log = log(Pop)) %>% select(-PPgdp,-Pop)
 lm_log = lm(ModernC ~ ., data = UN3_log)
@@ -112,7 +112,7 @@ par(mfrow = c(1,1))
 7. Given the selected transformations of the predictors, select a transformation of the response using `MASS::boxcox` or `car::boxCox` and justify.
 
 The boxCox method suggest a power transformation of the response variable to a power of 0.7585897.
-```{r}
+```{r,tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 car::boxCox(lm_log)
 powerTransform(lm_log)
 UN3_log_power = UN3_log %>% mutate(trans_modernC = ModernC ^ 0.7585897) %>% select(-ModernC)
@@ -144,6 +144,7 @@ boxTidwell(ModernC ~ Pop + PPgdp, ~ Change + Frate + Purban + Fertility, data = 
 
 First of all, the diagnostic plot from question 6 show that, there are influential points including Cook Islands, Vanuatu and Kuwait, but no point is outside the Coo's distance. The Bonferroni correction process also suggests that there is no outliers in the data, thus no point needs to be considered outliers and be removed.
 ```{r}
+summary(lm_log)
 p = 2*(1 - pt(abs(rstudent(lm_log)), lm_log$df - 1))
 rownames(UN3)[p<.05/nrow(UN3_log)]
 ```
@@ -162,7 +163,7 @@ Interpretations of the coefficients:
 `PPgdp_log`: each 1% increase in `PPgdp` results in a 0.048% increase in `ModernC`.
 `Pop_log`: each 1% increase in `Pop` results in a 0.014% increase in `ModernC`.
 
-```{r}
+```{r,tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 lm_noP = lm(ModernC ~ Frate + Fertility + Change_non + PPgdp_log + Pop_log, data = UN3_log)
 anova(lm_log,lm_noP)
 summary(lm_noP)
@@ -170,13 +171,18 @@ estimates = as.data.frame(summary(lm_noP)$coef)
 sum_sta_df = data.frame(confint(lm_noP),estimates$Estimate)
 sum_sta_df["Pop_log",] = sum_sta_df["Pop_log", ]*log(1.01)
 sum_sta_df["PPgdp_log", ] = sum_sta_df["PPgdp_log", ]*log(1.01)
-rownames(sum_sta_df) = c("(Intercept)", "Frate", "Fertility",  "Change", "1% Increase in PPgdp", "1% Increase in Pop")
+rownames(sum_sta_df) = c("(Intercept)", "Frate", "Fertility",  "Change",                                                "1% Increase in PPgdp", "1% Increase in Pop")
 colnames(sum_sta_df) = c("95% CI Lower bound", "95% CI upper bound", "Estimates")
-kable(sum_sta_df,caption="Estimates and CI of slope and intercept") %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+kable(sum_sta_df,caption="Estimates and CI of slope and intercept")                                                      %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 ```
 
 
-12. Provide a paragraph summarizing your final model  and findings suitable for the US envoy to the UN after adjusting for outliers or influential points.   You should provide a justification for any case deletions in your final model
+12. Provide a paragraph summarizing your final model  and findings suitable for the US envoy to the UN after adjusting for outliers or influential points.   You should provide a justification for any case deletions in your final model.
+
+First of all, there are a lot of influential points in terms of different predictors, with the most noticable being Poland and Azerbajian because they are potential outliers for almost all predictors. However, we decided that there is no case significantly enough to be considered an outlier, thus no case is removed.
+Second of all, in order to predict `ModernC`, we decided that whether the woman is from an urban location is not an influential predictor, thus we removed it from the group of predictors.
+The GDP per capital and population predictors do not have a clear linear relationship to `ModernC`, so we performed a log transformation on them. Other predictors remained on the natural scale.
+Last but not least, this dataset includes a large portion of cases with missing data. In the study above, missing data are simply omitted, but this could affect the precision of the analyses.
 
 
 
@@ -194,13 +200,23 @@ Since we have $(I-H)^T(I-H) = (I-H)$ and $(I-H)(I-H) = (I-H)$,
 $$(I-H)Y = \hat{\beta_0}\texttt{1}_{n \times 1}+\big(x_i^T(I-H)x_i\big)^{-1}x_i^T(I-H)Y(I-H)x_i$$
 By multiplying $x_i^T$ to both sides of the equation, we get:
 $$x_i^T(I-H)Y = x_i^T\hat{\beta_0}\texttt{1}_{n \times 1}+x_i^T\big(x_i^T(I-H)x_i\big)^{-1}x_i^T(I-H)Y(I-H)x_i$$
-$$x_i^T(I-H)Y = \hat{\beta_0}\sum x_i + x_i^T(I-H)Y$$ (The $x_i^T(I-H)x_i$ term is multiplied with its inverse to get 1)
+$$x_i^T(I-H)Y = \hat{\beta_0}\sum x_i + x_i^T(I-H)Y$$ 
+(The $x_i^T(I-H)x_i$ term is multiplied with its inverse to get 1)
 Thus we have: $\texttt{0} = \hat{\beta_0} \sum x_i$
 If there is an intercept, the sample mean of the residuals will always be zero. However, in practice the sample mean of the residuals cannot be 0, the intercept, therefore, is always zero in the added variable, showing a zero intercept in the scatter plot.
 
 14. For multiple regression with more than 2 predictors, say a full model given by `Y ~ X1 + X2 + ... Xp`   we create the added variable plot for variable `j` by regressing `Y` on all of the `X`'s except `Xj` to form `e_Y` and then regressing `Xj` on all of the other X's to form `e_X`.  Confirm that the slope in a manually constructed added variable plot for one of the predictors  in Ex. 10 is the same as the estimate from your model. 
 
+I selected `Fertility` as the predictor we're looking at.
 ```{r}
+lm_e_Y = lm(ModernC ~ Frate+ Fertility + Purban + PPgdp_log + Pop_log,data = UN3_log)
+e_Y = residuals(lm_e_Y)
+lm_e_X = lm(Change_non ~ Frate + Purban + Fertility + PPgdp_log + Pop_log, data = UN3_log)
+e_X = residuals(lm_e_X)
 
+q14_data = data.frame(e_Y,e_X)
+lm_q14 = lm(e_Y ~ e_X, data = q14_data)
+summary(lm_q14)
 ```
+The coefficient matches with the coefficient of `Change` in Q10.
 
